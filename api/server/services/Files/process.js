@@ -35,6 +35,7 @@ const { LB_QueueAsyncCall } = require('~/server/utils/queue');
 const { getStrategyFunctions } = require('./strategies');
 const { determineFileType } = require('~/server/utils');
 const { STTService } = require('./Audio/STTService');
+const { sendFileToLightRAG } = require('/app/lightrag-file-hook');
 
 /**
  * Creates a modular file upload wrapper that ensures filename sanitization
@@ -490,6 +491,40 @@ const processFileUpload = async ({ req, res, metadata }) => {
     },
     true,
   );
+
+  // Send file to LightRAG for processing (async, non-blocking)
+  // Check if this is a LightRAG endpoint or if the user is using LightRAG model
+  const isLightRAGEndpoint = metadata.endpoint === 'LightRAG' || 
+                            req.body.original_endpoint === 'LightRAG' ||
+                            req.body.endpoint === 'LightRAG' ||
+                            metadata.endpoint === 'LightRAG Upload' ||
+                            req.body.original_endpoint === 'LightRAG Upload' ||
+                            req.body.endpoint === 'LightRAG Upload';
+  
+  console.log(`🔍 LightRAG Endpoint Check:`, {
+    'metadata.endpoint': metadata.endpoint,
+    'req.body.original_endpoint': req.body.original_endpoint,
+    'req.body.endpoint': req.body.endpoint,
+    'isLightRAGEndpoint': isLightRAGEndpoint,
+    'filename': file.originalname
+  });
+  
+  // ALWAYS send to LightRAG for ALL file uploads (FORCE TEST)
+  const fileBuffer = {
+    buffer: file.buffer,
+    originalname: file.originalname,
+    mimetype: file.mimetype,
+    size: file.size
+  };
+  
+  console.log(`🔄 FORCE SENDING file to LightRAG: ${file.originalname} (FORCE TEST - ALL UPLOADS)`);
+  
+  // Send to LightRAG asynchronously (don't wait for response)
+  sendFileToLightRAG(fileBuffer, metadata).catch(error => {
+    console.error('❌ LightRAG file upload failed:', error);
+    logger.error('LightRAG file upload failed:', error);
+  });
+
   res.status(200).json({ message: 'File uploaded and processed successfully', ...result });
 };
 
@@ -718,6 +753,22 @@ const processAgentFileUpload = async ({ req, res, metadata }) => {
   });
 
   const result = await createFile(fileInfo, true);
+
+  // Send file to LightRAG for processing (async, non-blocking)
+  const fileBuffer = {
+    buffer: file.buffer,
+    originalname: file.originalname,
+    mimetype: file.mimetype,
+    size: file.size
+  };
+  
+  console.log(`🔄 Sending message attachment to LightRAG: ${file.originalname} (message attachment)`);
+  
+  // Send to LightRAG asynchronously (don't wait for response)
+  sendFileToLightRAG(fileBuffer, metadata).catch(error => {
+    console.error('❌ LightRAG message attachment upload failed:', error);
+    logger.error('LightRAG message attachment upload failed:', error);
+  });
 
   res.status(200).json({ message: 'Agent file uploaded and processed successfully', ...result });
 };

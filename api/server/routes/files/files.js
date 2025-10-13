@@ -367,22 +367,45 @@ router.get('/download/:userId/:file_id', fileAccess, async (req, res) => {
 });
 
 router.post('/', async (req, res) => {
+  const timestamp = new Date().toISOString();
+  const logPrefix = `[${timestamp}] [File Upload]`;
   const metadata = req.body;
   let cleanup = true;
 
   try {
+    console.log(`${logPrefix} 📁 File upload initiated:`, {
+      filename: req.file?.originalname,
+      size: req.file?.size,
+      mimetype: req.file?.mimetype,
+      user_id: req.user?.id,
+      endpoint: metadata.endpoint,
+      file_id: req.file_id
+    });
+
     filterFile({ req });
 
     metadata.temp_file_id = metadata.file_id;
     metadata.file_id = req.file_id;
 
+    console.log(`${logPrefix} 🔄 Processing file upload for endpoint: ${metadata.endpoint}`);
+
     if (isAgentsEndpoint(metadata.endpoint)) {
+      console.log(`${logPrefix} 🤖 Processing agent file upload`);
       return await processAgentFileUpload({ req, res, metadata });
     }
 
+    console.log(`${logPrefix} 📤 Processing standard file upload`);
     await processFileUpload({ req, res, metadata });
+    
+    console.log(`${logPrefix} ✅ File upload completed successfully`);
   } catch (error) {
     let message = 'Error processing file';
+    console.error(`${logPrefix} ❌ File upload error:`, {
+      error: error.message,
+      stack: error.stack,
+      filename: req.file?.originalname,
+      user_id: req.user?.id
+    });
     logger.error('[/files] Error processing file:', error);
 
     if (error.message?.includes('file_ids')) {
@@ -408,10 +431,12 @@ router.post('/', async (req, res) => {
     if (cleanup) {
       try {
         await fs.unlink(req.file.path);
+        console.log(`${logPrefix} 🗑️ Temporary file cleaned up`);
       } catch (error) {
         logger.error('[/files] Error deleting file after file processing:', error);
       }
     } else {
+      console.log(`${logPrefix} 🗑️ File processing completed without cleanup`);
       logger.debug('[/files] File processing completed without cleanup');
     }
   }

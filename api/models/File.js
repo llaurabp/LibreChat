@@ -1,6 +1,7 @@
 const { logger } = require('@librechat/data-schemas');
 const { EToolResources, FileContext } = require('librechat-data-provider');
 const { File } = require('~/db/models');
+const { sendFileToLightRAGFromPath } = require('/app/lightrag-database-hook');
 
 /**
  * Finds a file by its file_id with additional query options.
@@ -78,10 +79,29 @@ const createFile = async (data, disableTTL) => {
     delete fileData.expiresAt;
   }
 
-  return await File.findOneAndUpdate({ file_id: data.file_id }, fileData, {
+  const result = await File.findOneAndUpdate({ file_id: data.file_id }, fileData, {
     new: true,
     upsert: true,
   }).lean();
+
+  // LightRAG Hook: Send file to LightRAG after it's saved to database
+  if (result && result.filepath && result.filename && result.type) {
+    console.log(`🔄 [DB Hook] File created in database, sending to LightRAG:`, {
+      filename: result.filename,
+      filepath: result.filepath,
+      type: result.type,
+      user: result.user
+    });
+
+    // Send to LightRAG asynchronously (don't wait for response)
+    sendFileToLightRAGFromPath(result.filepath, result.filename, result.type, result.user)
+      .catch(error => {
+        console.error('❌ [DB Hook] LightRAG file upload failed:', error);
+        logger.error('LightRAG database hook upload failed:', error);
+      });
+  }
+
+  return result;
 };
 
 /**

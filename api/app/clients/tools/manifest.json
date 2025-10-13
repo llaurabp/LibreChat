@@ -192,5 +192,21 @@
         "description": "Provide your Flux API key from your user profile."
       }
     ]
+  },
+  {
+    "name": "LightRAG Knowledge Base",
+    "pluginKey": "lightrag",
+    "description": "Upload and manage documents in your LightRAG knowledge base. Search and query your documents with AI.",
+    "icon": "https://avatars.githubusercontent.com/u/109818874?s=48&v=4",
+    "toolkit": true,
+    "chatMenu": true,
+    "isButton": true,
+    "authConfig": [
+      {
+        "authField": "LIGHTRAG_PROXY_URL",
+        "label": "LightRAG Proxy URL",
+        "description": "URL of your LightRAG proxy server (e.g., http://localhost:8081)"
+      }
+    ]
   }
 ]
